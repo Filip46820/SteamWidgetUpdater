@@ -173,5 +173,6 @@ Incorrect APPLICATION_ID or DISCORD_USER_ID.
 ---
 >[!WARNING]
 >* Never hardcode secrets in code
+>* 
 >* Never commit .env files
 >* Always use GitHub Secrets
