@@ -83,70 +83,6 @@ async function steam(url, retries = 3) {
     throw lastError;
 }
 
-// Account Age
-
-async function getProfileAge() {
-    console.log("→ Fetching profile age from Steam community...");
-    try {
-        const response = await fetch(
-            `https://steamcommunity.com/profiles/${STEAM_ID}/?xml=1`
-        );
-
-        if (!response.ok) {
-            console.warn(`⚠ Profile XML request failed with status ${response.status}`);
-            return "Unknown";
-        }
-
-        const xml = await response.text();
-        console.log("  XML response received, parsing memberSince...");
-
-        const match = xml.match(
-            /<memberSince>(.*?)<\/memberSince>/
-        );
-
-        if (!match) {
-            console.warn("⚠ Could not find memberSince tag in XML");
-            return "Unknown";
-        }
-
-        const created = new Date(match[1]);
-
-        if (isNaN(created)) {
-            console.warn(`⚠ Invalid creation date parsed: ${match[1]}`);
-            return "Unknown";
-        }
-
-        console.log(`  Profile creation date: ${created.toISOString()}`);
-
-        const now = new Date();
-        let years =
-            now.getFullYear() -
-            created.getFullYear();
-
-        const monthDiff =
-            now.getMonth() -
-            created.getMonth();
-
-        if (
-            monthDiff < 0 ||
-            (
-                monthDiff === 0 &&
-                now.getDate() < created.getDate()
-            )
-        ) {
-            years--;
-        }
-
-        const ageText = `${years} Years`;
-        console.log(`  Calculated profile age: ${ageText}`);
-        return ageText;
-
-    } catch (err) {
-        console.error("✗ Error fetching profile age:", err.message);
-        return "Unknown";
-    }
-}
-
 // Discord Widget Updater
 
 async function updateDiscordWidget(widget) {
@@ -192,8 +128,7 @@ async function main() {
         recent,
         level,
         badges,
-        friendsRaw,
-        profileAge
+        friendsRaw
     ] = await Promise.all([
         steam(
             `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key=${STEAM_API_KEY}&steamids=${STEAM_ID}`
@@ -212,8 +147,7 @@ async function main() {
         ),
         steam(
             `https://api.steampowered.com/ISteamUser/GetFriendList/v1/?key=${STEAM_API_KEY}&steamid=${STEAM_ID}&relationship=friend`
-        ),
-        getProfileAge()
+        )
     ]);
 
     console.log("✓ All Steam data fetched successfully.");
@@ -222,6 +156,22 @@ async function main() {
 
     const player = summary.response.players?.[0];
     console.log(`Player: ${player?.personaname || "Unknown"} (${STEAM_ID})`);
+
+        // --- Profile age from timecreated ---
+    let profileAge = "Unknown";
+    if (player?.timecreated) {
+        const created = new Date(player.timecreated * 1000);
+        const now = new Date();
+        let years = now.getFullYear() - created.getFullYear();
+        const monthDiff = now.getMonth() - created.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < created.getDate())) {
+            years--;
+        }
+        profileAge = `${years} Years`;
+        console.log(`Profile age (from timecreated): ${profileAge}`);
+    } else {
+        console.warn("⚠ No timecreated field in player summary");
+    }
 
     const games = owned.response.games || [];
     console.log(`Owned games data: ${games.length} entries`);
